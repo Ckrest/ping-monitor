@@ -1,0 +1,13 @@
+[targets]
+hosts = [
+    "8.8.8.8",
+    "1.1.1.1",
+]
+
+[schedule]
+interval_seconds = 30
+packets = 3
+timeout = 5
+
+[storage]
+retention_days = 30
