@@ -1,0 +1,10 @@
+# ping-monitor - cli trait configuration
+
+entry_point: ./src/main.py
+runtime: python
+commands:
+- run
+- query
+- stats
+- ping
+- init

@@ -1,0 +1,14 @@
+[project]
+name = "ping-monitor"
+description = "Network latency and connectivity monitoring with history tracking"
+requires-python = ">=3.10"
+dependencies = [
+    "tomli>=2.0.0; python_version<'3.11'",
+]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

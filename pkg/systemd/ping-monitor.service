@@ -1,0 +1,14 @@
+[Unit]
+Description=Ping Monitor - Network latency and connectivity monitoring
+Documentation=file:///home/nick/Systems/tools/ping-monitor/config.toml
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Systems/tools/ping-monitor
+ExecStart=/usr/bin/python3 /home/nick/Systems/tools/ping-monitor/src/main.py run
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
