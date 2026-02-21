@@ -340,6 +340,133 @@ def get_stats(host: Optional[str] = None, hours: int = 24) -> dict:
     return results
 
 
+
+def get_latest_host_rows(hours: int = 24) -> list[dict]:
+    """Return latest row per host for the given time window."""
+    if not DB_PATH.exists():
+        return []
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+
+    cursor.execute(
+        """
+        SELECT p1.*
+        FROM ping_results p1
+        JOIN (
+            SELECT host, MAX(timestamp) AS max_ts
+            FROM ping_results
+            WHERE timestamp > ?
+            GROUP BY host
+        ) p2 ON p1.host = p2.host AND p1.timestamp = p2.max_ts
+        ORDER BY p1.host ASC
+        """,
+        (cutoff,),
+    )
+
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    for row in rows:
+        loss = float(row.get('packet_loss_percent') or 0.0)
+        row['status'] = 'online' if loss < 100.0 else 'offline'
+        avg = row.get('avg_ms')
+        row['avg_ms'] = round(float(avg), 2) if avg is not None else None
+        jitter = row.get('jitter_ms')
+        row['jitter_ms'] = round(float(jitter), 2) if jitter is not None else None
+    return rows
+
+
+def get_storage_stats() -> dict:
+    """Return database/storage stats for settings-hub."""
+    payload = {
+        'db_path': str(DB_PATH),
+        'db_size_bytes': DB_PATH.stat().st_size if DB_PATH.exists() else 0,
+        'records': 0,
+        'oldest_timestamp': None,
+        'newest_timestamp': None,
+    }
+
+    if not DB_PATH.exists():
+        return payload
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM ping_results')
+    count, oldest, newest = cursor.fetchone()
+    conn.close()
+
+    payload['records'] = int(count or 0)
+    payload['oldest_timestamp'] = oldest
+    payload['newest_timestamp'] = newest
+    return payload
+
+
+def settings_hub_payload(view: str, host: Optional[str] = None, hours: int = 24):
+    """Build machine-readable payloads consumed by settings-hub tiles."""
+    init_database()
+
+    if view == 'series':
+        config = load_config()
+        fallback_hosts = config.get('targets', {}).get('hosts', [])
+        target = host or (fallback_hosts[0] if fallback_hosts else None)
+        if not target:
+            return []
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+        cursor.execute(
+            "SELECT avg_ms FROM ping_results WHERE timestamp > ? AND host = ? AND avg_ms IS NOT NULL ORDER BY timestamp DESC LIMIT 160",
+            (cutoff, target),
+        )
+        values = [float(row[0]) for row in cursor.fetchall() if row and row[0] is not None]
+        conn.close()
+        values.reverse()
+        return values
+
+    if view == 'hosts':
+        return get_latest_host_rows(hours=hours)
+
+    if view == 'storage':
+        return get_storage_stats()
+
+    stats = get_stats(hours=hours)
+    latest_rows = get_latest_host_rows(hours=hours)
+    host_count = len(stats)
+
+    avg_latency_values = [entry.get('avg_latency_ms') for entry in stats.values() if entry.get('avg_latency_ms') is not None]
+    avg_loss_values = [entry.get('avg_loss_percent') for entry in stats.values() if entry.get('avg_loss_percent') is not None]
+    uptime_values = [entry.get('uptime_percent') for entry in stats.values() if entry.get('uptime_percent') is not None]
+
+    summary = {
+        'badge': host_count,
+        'text': f"{host_count} hosts",
+        'status': 'ok' if host_count > 0 else 'warn',
+        'hosts': host_count,
+        'avg_latency_ms': round(sum(avg_latency_values) / len(avg_latency_values), 2) if avg_latency_values else 0.0,
+        'avg_loss_percent': round(sum(avg_loss_values) / len(avg_loss_values), 2) if avg_loss_values else 0.0,
+        'uptime_percent': round(sum(uptime_values) / len(uptime_values), 2) if uptime_values else 0.0,
+        'failed_tests': int(sum(entry.get('failed_tests', 0) for entry in stats.values())),
+        'samples': int(sum(entry.get('samples', 0) for entry in stats.values())),
+        'last_updated': latest_rows[-1]['timestamp'] if latest_rows else None,
+    }
+
+    if view == 'summary':
+        return summary
+
+    if view == 'resolved':
+        return {
+            'summary': summary,
+            'hosts': latest_rows,
+            'storage': get_storage_stats(),
+            'config': load_config(),
+        }
+
+    raise ValueError(f'Unsupported settings-hub view: {view}')
+
 def main():
     """Main entry point with CLI."""
     parser = argparse.ArgumentParser(
@@ -370,6 +497,19 @@ def main():
     # Init command
     subparsers.add_parser("init", help="Initialize database")
 
+    # Settings Hub payload command
+    sh_parser = subparsers.add_parser(
+        "settings-hub",
+        help="Machine-readable payloads for settings-hub tiles",
+    )
+    sh_parser.add_argument(
+        "view",
+        choices=["summary", "hosts", "series", "storage", "resolved"],
+        help="Payload view",
+    )
+    sh_parser.add_argument("--host", help="Host override for series payload")
+    sh_parser.add_argument("--hours", type=int, default=24, help="Hours to look back")
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -390,6 +530,9 @@ def main():
     elif args.command == "init":
         init_database()
         print(f"Database initialized at {DB_PATH}")
+    elif args.command == "settings-hub":
+        payload = settings_hub_payload(args.view, host=args.host, hours=args.hours)
+        print(json.dumps(payload, indent=2))
     else:
         parser.print_help()
 
