@@ -2,6 +2,10 @@
 
 Lightweight network monitoring service that periodically pings configured hosts and stores results in SQLite for historical analysis.
 
+## Preview
+
+![Ping Monitor](screenshots/showcase.png)
+
 ## Setup
 
 ```bash
