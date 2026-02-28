@@ -6,7 +6,7 @@ Renders a GTK4 window displaying real ping-monitor data from history.db
 using graph-lib widgets. Screenshot this window for the README.
 
 Usage:
-    python showcase.py
+    python examples/showcase.py
 """
 
 import sqlite3
@@ -19,7 +19,6 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw
-
 from graph_lib.widgets.graph_widget import GraphWidget
 from graph_lib.renderers.line_chart import LineChartRenderer
 from graph_lib.renderers.gauge import GaugeRenderer
@@ -27,7 +26,7 @@ from graph_lib.providers.sqlite_provider import SQLiteProvider
 from graph_lib.providers.static_provider import StaticProvider
 from graph_lib.providers.base import DataPoint
 
-DB_PATH = Path(__file__).parent / "history.db"
+DB_PATH = Path(__file__).parent.parent / "src" / "history.db"
 
 
 def _hours_to_cover_last_day() -> int:

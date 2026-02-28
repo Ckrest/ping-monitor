@@ -1,2 +1,32 @@
-# Runtime data
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.venv/
+
+# Packaging
+*.egg-info/
+dist/
+build/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Published package requirements
+.env
+*.log
 *.db
+*.sqlite3
+*.pkl
+*.pt
