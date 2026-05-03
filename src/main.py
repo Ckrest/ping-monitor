@@ -453,6 +453,22 @@ def settings_hub_payload(view: str, host: Optional[str] = None, hours: int = 24)
         'samples': int(sum(entry.get('samples', 0) for entry in stats.values())),
         'last_updated': latest_rows[-1]['timestamp'] if latest_rows else None,
     }
+    stale = True
+    if summary['last_updated']:
+        try:
+            last_dt = datetime.fromisoformat(str(summary['last_updated']))
+            interval = int(load_config().get('schedule', {}).get('interval_seconds', 60) or 60)
+            stale = (datetime.now() - last_dt).total_seconds() > max(interval * 3, 180)
+        except Exception:
+            stale = True
+    summary['collector_stale'] = stale
+    if stale and host_count:
+        summary['status'] = 'warn'
+    summary['health'] = {
+        'status': summary['status'],
+        'text': 'Network monitor current' if not stale else 'Network monitor stale',
+        'detail': f"Last sample: {summary['last_updated'] or 'never'}",
+    }
 
     if view == 'summary':
         return summary
