@@ -5,6 +5,7 @@ After=network-online.target
 
 [Service]
 Type=simple
+Slice=background.slice
 WorkingDirectory=%h/Systems/tools/ping-monitor
 ExecStart=/usr/bin/python3 /home/nick/Systems/tools/ping-monitor/src/main.py run
 Restart=on-failure
