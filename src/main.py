@@ -18,7 +18,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-import tomli
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 # Paths
 TOOL_DIR = Path(__file__).parent
@@ -54,7 +57,7 @@ def load_config() -> dict:
         }
 
     with open(CONFIG_PATH, "rb") as f:
-        return tomli.load(f)
+        return tomllib.load(f)
 
 
 def init_database():
